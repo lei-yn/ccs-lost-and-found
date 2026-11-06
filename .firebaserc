@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "yanproject-ca803"
+  },
+  "targets": {
+    "yanproject-ca803": {
+      "hosting": {
+        "main": [
+          "ccslfms"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

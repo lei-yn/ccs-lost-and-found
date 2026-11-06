@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to verify caller has an institutional school email or authenticated google account
+    function isSchoolEmail() {
+      return request.auth != null &&
+        request.auth.token.email != null &&
+        (
+          request.auth.token.firebase.sign_in_provider == 'google.com' ||
+          request.auth.token.email.matches('.*@.*\\.edu$') ||
+          request.auth.token.email.matches('.*@.*\\.edu\\.ph$') ||
+          request.auth.token.email.matches('.*@.*\\.onmicrosoft\\.com$') ||
+          request.auth.token.email.matches('.*@ccs\\.edu$') ||
+          request.auth.token.email.matches('.*@student\\.edu$') ||
+          request.auth.token.email.matches('.*@school\\.edu$')
+        );
+    }
+
+    // Helper function to check if caller has a specific role
+    function getUserRole() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ?
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : 'student';
+    }
+    
+    function isStaffOrAdmin() {
+      return isSchoolEmail() && (getUserRole() == 'staff' || getUserRole() == 'admin');
+    }
+
+    // User profiles
+    match /users/{userId} {
+      // Authenticated institutional school users can read profiles
+      allow read: if isSchoolEmail();
+      // Validated school users can create their own profile, or admins can create/pre-assign profiles
+      allow create: if isSchoolEmail() && (request.auth.uid == userId || getUserRole() == 'admin');
+      // Users can update their profile; non-admins are strictly forbidden from modifying the 'role' field
+      allow update: if isSchoolEmail() && (
+        (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) ||
+        (getUserRole() == 'admin')
+      );
+      allow delete: if isSchoolEmail() && getUserRole() == 'admin';
+    }
+
+    // Lost & Found Items
+    match /items/{itemId} {
+      // Anyone can browse, create, and update item status/handover
+      allow read, create, update: if true;
+      // Only staff or admin can delete records
+      allow delete: if isStaffOrAdmin();
+    }
+
+    // Claims submitted for found items
+    match /claims/{claimId} {
+      // Authenticated users and custodians can create and update claims
+      allow read, create, update: if true;
+      allow delete: if isStaffOrAdmin();
+    }
+
+    // Finder reports submitted for lost items
+    match /finderReports/{reportId} {
+      // Anyone can submit, update and verify finder reports
+      allow read, create, update: if true;
+      allow delete: if isStaffOrAdmin();
+    }
+
+    // Role-based notifications stream
+    match /notifications/{notifId} {
+      allow read, create, update: if true;
+      allow delete: if isStaffOrAdmin();
+    }
+  }
+}

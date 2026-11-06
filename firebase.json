@@ -1,0 +1,15 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "hosting": [
+    {
+      "site": "yanproject-ca803",
+      "public": "public"
+    },
+    {
+      "site": "ccslfms",
+      "public": "public"
+    }
+  ]
+}
